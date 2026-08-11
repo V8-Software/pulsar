@@ -1,0 +1,4 @@
+interface:
+  display_name: "Начало тестирования 1С"
+  short_description: "Готовит TestClient и TestManager к проверке"
+  default_prompt: "Используй $testing-start, чтобы подготовить сеансы и справочник API перед тестированием формы 1С."

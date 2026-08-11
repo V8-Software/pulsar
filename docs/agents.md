@@ -14,20 +14,23 @@
 
 Если в проекте уже есть `AGENTS.md`, перенесите только относящийся к V8:Pulsar раздел. Сохраните собственные правила проекта и не затирайте их образцом.
 
-## Установка навыка
+## Установка навыков
 
-Навык [`v8-gui-validation`](../skills/v8-gui-validation/SKILL.md) задаёт проверяемый порядок работы с интерфейсом Windows и 1С.
+Доступны два дополняющих друг друга навыка:
 
-Для Codex скопируйте каталог навыка в:
+- [`testing-start`](../skills/testing-start/SKILL.md) — подготавливает TestClient, TestManager и справочник API перед автоматизированным тестированием форм 1С;
+- [`v8-gui-validation`](../skills/v8-gui-validation/SKILL.md) — задаёт проверяемый порядок для многошаговых сценариев в интерфейсе Windows и 1С.
+
+Для Codex скопируйте нужные каталоги навыков в:
 
 ```text
-%USERPROFILE%\.codex\skills\v8-gui-validation
+%USERPROFILE%\.codex\skills\<имя-навыка>
 ```
 
 Для среды, которая ищет общие навыки агентов, используйте:
 
 ```text
-%USERPROFILE%\.agents\skills\v8-gui-validation
+%USERPROFILE%\.agents\skills\<имя-навыка>
 ```
 
 После копирования перезапустите или обновите список навыков в используемом агенте.

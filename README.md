@@ -25,7 +25,7 @@ V8:Pulsar — лёгкий многофункциональный MCP-серве
 1. Установите и запустите V8:Pulsar.
 2. Добавьте сервер `http://localhost:8010/mcp` в настройки MCP-клиента. Готовый образец: [`.mcp.json`](configs/.mcp.json).
 3. При необходимости добавьте в проект [образец `AGENTS.md`](configs/AGENTS.md).
-4. Установите навык [`v8-gui-validation`](skills/v8-gui-validation/SKILL.md), если агент должен проверять многошаговые сценарии в интерфейсе 1С и Windows.
+4. Установите [`testing-start`](skills/testing-start/SKILL.md) для автоматизированного тестирования форм 1С и [`v8-gui-validation`](skills/v8-gui-validation/SKILL.md) для многошаговых сценариев в интерфейсе 1С и Windows.
 
 Подробный порядок: [настройка агентов](docs/agents.md).
 
