@@ -1,0 +1,30 @@
+name: Предложить улучшение
+description: Опишите новый сценарий или улучшение V8:Pulsar
+title: "[Предложение] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Какой сценарий нужно улучшить
+      description: Опишите задачу пользователя или агента и текущий результат.
+    validations:
+      required: true
+  - type: textarea
+    id: desired-result
+    attributes:
+      label: Какой результат нужен
+      description: Опишите наблюдаемый результат без привязки к внутренней реализации.
+    validations:
+      required: true
+  - type: textarea
+    id: importance
+    attributes:
+      label: Почему это важно
+      description: Расскажите, кому и как часто нужен этот сценарий.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Как вы решаете задачу сейчас
+      description: Если есть временный обходной путь, опишите его.

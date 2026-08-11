@@ -1,0 +1,4 @@
+.release-assets/
+*.tmp
+Thumbs.db
+.DS_Store

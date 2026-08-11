@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "v8-pulsar": {
+      "type": "http",
+      "url": "http://localhost:8010/mcp"
+    }
+  }
+}
