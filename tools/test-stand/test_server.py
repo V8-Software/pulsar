@@ -94,13 +94,60 @@ class FindExeTests(unittest.TestCase):
             with mock.patch.dict(server.os.environ, {"V8_PULSAR_EXE": str(executable)}, clear=False):
                 self.assertEqual(server.find_exe(), executable.resolve())
 
-    def test_returns_none_for_missing_explicit_path_without_other_candidates(self):
-        with mock.patch.dict(
-            server.os.environ,
-            {"V8_PULSAR_EXE": "Z:\\missing\\v8-pulsar.exe", "PATH": ""},
-            clear=True,
-        ), mock.patch.object(server.Path, "is_file", return_value=False):
-            self.assertIsNone(server.find_exe())
+    def test_finds_local_development_build(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = Path(temp_dir) / "workspace"
+            stand_file = repository / "ТестовыйСтенд" / "server.py"
+            executable = (
+                repository
+                / "v8-pulsar"
+                / "bin"
+                / "Release"
+                / "net9.0-windows10.0.17763.0"
+                / "win-x64"
+                / "v8-pulsar.exe"
+            )
+            stand_file.parent.mkdir(parents=True)
+            executable.parent.mkdir(parents=True)
+            stand_file.touch()
+            executable.touch()
+
+            with mock.patch.object(server, "__file__", str(stand_file)), mock.patch.dict(
+                server.os.environ,
+                {"PATH": ""},
+                clear=True,
+            ):
+                self.assertEqual(server.find_exe(), executable.resolve())
+
+    def test_finds_installed_application(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_app_data = Path(temp_dir) / "LocalAppData"
+            executable = local_app_data / "Programs" / "V8Pulsar" / "v8-pulsar.exe"
+            stand_file = Path(temp_dir) / "public" / "tools" / "test-stand" / "server.py"
+            executable.parent.mkdir(parents=True)
+            stand_file.parent.mkdir(parents=True)
+            executable.touch()
+            stand_file.touch()
+
+            with mock.patch.object(server, "__file__", str(stand_file)), mock.patch.dict(
+                server.os.environ,
+                {"LOCALAPPDATA": str(local_app_data), "PATH": ""},
+                clear=True,
+            ):
+                self.assertEqual(server.find_exe(), executable.resolve())
+
+    def test_returns_none_when_no_candidate_exists(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            stand_file = Path(temp_dir) / "public" / "tools" / "test-stand" / "server.py"
+            stand_file.parent.mkdir(parents=True)
+            stand_file.touch()
+
+            with mock.patch.object(server, "__file__", str(stand_file)), mock.patch.dict(
+                server.os.environ,
+                {"V8_PULSAR_EXE": "Z:\\missing\\v8-pulsar.exe", "PATH": ""},
+                clear=True,
+            ):
+                self.assertIsNone(server.find_exe())
 
 
 class _ScreenshotMCP:
@@ -156,7 +203,6 @@ class ScreenshotHttpTests(unittest.TestCase):
                 httpd.server_close()
                 thread.join(timeout=5)
                 server.mcp = None
-
 
 if __name__ == "__main__":
     unittest.main()
