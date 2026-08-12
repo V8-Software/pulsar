@@ -22,6 +22,10 @@
 
   <ItemGroup>
     <Resource Include="Assets\Mouse.png" />
+    <None Update="Assets\guard.wav"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          TargetPath="guard.wav" />
   </ItemGroup>
 
   <ItemGroup>

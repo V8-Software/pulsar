@@ -82,7 +82,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $requiredFiles = @(
     "test-give-me-space.exe",
-    "test-give-me-space-server.exe"
+    "test-give-me-space-server.exe",
+    "guard.wav"
 )
 
 foreach ($fileName in $requiredFiles) {

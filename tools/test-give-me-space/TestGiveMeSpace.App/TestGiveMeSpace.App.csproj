@@ -45,12 +45,15 @@
              Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishDir=$(TestGiveMeSpaceServerPublishDir)" />
     <Error Condition="!Exists('$(TestGiveMeSpaceServerPublishDir)test-give-me-space-server.exe')"
            Text="Published test-give-me-space-server.exe was not found in $(TestGiveMeSpaceServerPublishDir)" />
+    <Error Condition="!Exists('$(TestGiveMeSpaceServerPublishDir)guard.wav')"
+           Text="Published guard.wav was not found in $(TestGiveMeSpaceServerPublishDir)" />
     <ItemGroup>
-      <TestGiveMeSpaceServerPublishedExe Include="$(TestGiveMeSpaceServerPublishDir)test-give-me-space-server.exe" />
+      <TestGiveMeSpaceServerPublishedFiles Include="$(TestGiveMeSpaceServerPublishDir)test-give-me-space-server.exe" />
+      <TestGiveMeSpaceServerPublishedFiles Include="$(TestGiveMeSpaceServerPublishDir)guard.wav" />
       <TestGiveMeSpaceStaleServerFiles Include="$(PublishDir)test-give-me-space-server.*" />
     </ItemGroup>
     <Delete Files="@(TestGiveMeSpaceStaleServerFiles)" />
-    <Copy SourceFiles="@(TestGiveMeSpaceServerPublishedExe)"
+    <Copy SourceFiles="@(TestGiveMeSpaceServerPublishedFiles)"
           DestinationFolder="$(PublishDir)"
           SkipUnchangedFiles="true" />
   </Target>

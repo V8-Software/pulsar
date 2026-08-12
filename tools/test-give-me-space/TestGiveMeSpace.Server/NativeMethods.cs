@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using TestGiveMeSpace.Core;
@@ -6,10 +7,14 @@ namespace TestGiveMeSpace.Server;
 
 internal static class NativeMethods
 {
+    private const string GuardSoundFileName = "guard.wav";
     private const int GwlExStyle = -20;
     private const long WsExNoActivate = 0x08000000L;
     private const long WsExToolWindow = 0x00000080L;
     private const uint MbIconAsterisk = 0x00000040;
+    private const uint SndAsync = 0x0001;
+    private const uint SndFilename = 0x00020000;
+    private const uint SndNodefault = 0x0002;
     private const uint SwpNoSize = 0x0001;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
@@ -22,7 +27,14 @@ internal static class NativeMethods
         SetWindowLongPtr(handle, GwlExStyle, style | (nint)(WsExNoActivate | WsExToolWindow));
     }
 
-    public static void PlayGuardSound() => MessageBeep(MbIconAsterisk);
+    public static void PlayGuardSound()
+    {
+        string soundPath = Path.Combine(AppContext.BaseDirectory, GuardSoundFileName);
+        if (!PlaySound(soundPath, IntPtr.Zero, SndFilename | SndAsync | SndNodefault))
+        {
+            MessageBeep(MbIconAsterisk);
+        }
+    }
 
     public static Point GetCursorPosition()
         => GetCursorPos(out NativePoint point)
@@ -149,6 +161,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool MessageBeep(uint type);
+
+    [DllImport("winmm.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PlaySound(string pszSound, IntPtr hmod, uint fdwSound);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

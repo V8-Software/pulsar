@@ -15,7 +15,7 @@
         MouseMove="Window_MouseMove"
         MouseLeftButtonUp="Window_MouseLeftButtonUp"
         MouseRightButtonUp="Window_MouseRightButtonUp">
-    <Border x:Name="PlaqueBorder" Background="#111111" BorderBrush="#111111" BorderThickness="2" Padding="16,6,8,6" CornerRadius="2" MinWidth="320">
+    <Border x:Name="PlaqueBorder" Background="#111111" BorderBrush="#111111" BorderThickness="4" Padding="16,6,8,6" CornerRadius="2" MinWidth="320">
         <Grid VerticalAlignment="Center">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />

@@ -17,9 +17,9 @@ public partial class MainWindow : Window, IPlaqueWindow
     private static readonly Brush NormalBackground = new SolidColorBrush(Color.FromRgb(0x11, 0x11, 0x11));
     private static readonly Brush NormalForeground = Brushes.White;
     private static readonly Brush NormalBorderBrush = NormalBackground;
-    private static readonly Brush ActiveMouseBackground = Brushes.White;
-    private static readonly Brush ActiveMouseForeground = Brushes.Black;
-    private static readonly Brush ActiveMouseBorderBrush = Brushes.Black;
+    private static readonly Brush ActiveMouseBackground = CreateActiveMouseBrush();
+    private static readonly Brush ActiveMouseForeground = Brushes.White;
+    private static readonly Brush ActiveMouseBorderBrush = ActiveMouseBackground;
 
     private readonly SettingsStore settingsStore;
     private readonly MonitorWorkingArea? forcedWorkingArea;
@@ -32,6 +32,13 @@ public partial class MainWindow : Window, IPlaqueWindow
     private bool isDragging;
     private bool noActivateStyleApplied;
     private bool cursorHighlightVisible;
+
+    private static Brush CreateActiveMouseBrush()
+    {
+        SolidColorBrush brush = new(Color.FromRgb(0xE5, 0x5A, 0x5F));
+        brush.Freeze();
+        return brush;
+    }
 
     public MainWindow(SettingsStore settingsStore)
         : this(settingsStore, null)
@@ -272,6 +279,7 @@ public partial class MainWindow : Window, IPlaqueWindow
         PlaqueBorder.Background = visible ? ActiveMouseBackground : NormalBackground;
         PlaqueBorder.BorderBrush = visible ? ActiveMouseBorderBrush : NormalBorderBrush;
         MessageTextBlock.Foreground = visible ? ActiveMouseForeground : NormalForeground;
+        MessageTextBlock.FontWeight = visible ? FontWeights.Bold : FontWeights.Normal;
         MouseIcon.Visibility = visible ? Visibility.Visible : Visibility.Hidden;
     }
 
