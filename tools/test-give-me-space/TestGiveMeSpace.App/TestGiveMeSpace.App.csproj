@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-windows10.0.17763.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>test-give-me-space</AssemblyName>
+    <RootNamespace>TestGiveMeSpace.App</RootNamespace>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <StartupObject>TestGiveMeSpace.App.Program</StartupObject>
+    <RollForward>LatestMinor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TestGiveMeSpace.Core\TestGiveMeSpace.Core.csproj" />
+    <ProjectReference Include="..\TestGiveMeSpace.Server\TestGiveMeSpace.Server.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <Target Name="BuildAndCopyTestGiveMeSpaceServer"
+          AfterTargets="Build"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <TestGiveMeSpaceServerOutput Include="$(MSBuildThisFileDirectory)..\TestGiveMeSpace.Server\bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(TestGiveMeSpaceServerOutput)"
+          DestinationFiles="@(TestGiveMeSpaceServerOutput->'$(TargetDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishAndCopyTestGiveMeSpaceServer"
+          AfterTargets="Publish"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <TestGiveMeSpaceServerPublishDir>$(MSBuildThisFileDirectory)obj\test-give-me-space-server-publish\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\</TestGiveMeSpaceServerPublishDir>
+    </PropertyGroup>
+    <RemoveDir Directories="$(TestGiveMeSpaceServerPublishDir)" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)..\TestGiveMeSpace.Server\TestGiveMeSpace.Server.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishDir=$(TestGiveMeSpaceServerPublishDir)" />
+    <Error Condition="!Exists('$(TestGiveMeSpaceServerPublishDir)test-give-me-space-server.exe')"
+           Text="Published test-give-me-space-server.exe was not found in $(TestGiveMeSpaceServerPublishDir)" />
+    <Error Condition="!Exists('$(TestGiveMeSpaceServerPublishDir)guard.wav')"
+           Text="Published guard.wav was not found in $(TestGiveMeSpaceServerPublishDir)" />
+    <ItemGroup>
+      <TestGiveMeSpaceServerPublishedFiles Include="$(TestGiveMeSpaceServerPublishDir)test-give-me-space-server.exe" />
+      <TestGiveMeSpaceServerPublishedFiles Include="$(TestGiveMeSpaceServerPublishDir)guard.wav" />
+      <TestGiveMeSpaceStaleServerFiles Include="$(PublishDir)test-give-me-space-server.*" />
+    </ItemGroup>
+    <Delete Files="@(TestGiveMeSpaceStaleServerFiles)" />
+    <Copy SourceFiles="@(TestGiveMeSpaceServerPublishedFiles)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

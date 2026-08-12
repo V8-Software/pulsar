@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V8:Pulsar — Тестовый стенд</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F7FA;
+    --panel: #FFFFFF;
+    --panel-border: #E0E6ED;
+    --header-bg: #18476B;
+    --header-text: #FFFFFF;
+    --header-subtext: #D7E5EF;
+    --mark: #F59E0B;
+    --accent: #124A76;
+    --accent-hover: #0D3E66;
+    --accent-soft: #EAF1F7;
+    --text: #20384A;
+    --text-soft: #50677A;
+    --text-muted: #708497;
+    --line: #EEF2F6;
+    --input-bg: #F7FAFC;
+    --input-border: #D9E2EA;
+    --ok: #2E7D4F;
+    --err: #B43F3F;
+    --warn: #B36D00;
+    --mono: 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  body { overflow: hidden; }
+
+  .page {
+    width: 100%;
+    max-width: 1800px;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0 auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    --result-height: clamp(154px, 23vh, 240px);
+    grid-template-rows: minmax(0, 1fr) 10px var(--result-height);
+    gap: 14px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .tool-workspace {
+    display: contents;
+  }
+
+  .tool-column {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
+    scroll-behavior: smooth;
+  }
+
+  .tool-nav {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    min-width: 0;
+    min-height: 0;
+    padding: 16px 14px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+  .tool-nav .panel-title { margin-bottom: 12px; }
+  .tool-nav-group + .tool-nav-group {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+  .tool-nav-group-title {
+    margin: 0 8px 5px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .tool-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    color: var(--text-soft);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .tool-nav-link::before {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--input-border);
+    content: '';
+  }
+  .tool-nav-link:hover {
+    background: var(--input-bg);
+    color: var(--accent);
+  }
+  .tool-nav-link.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .tool-nav-link.active::before { background: var(--accent); }
+
+  .tool-section {
+    scroll-margin-top: 0;
+  }
+
+  .workspace-resizer {
+    grid-column: 2;
+    grid-row: 2;
+    position: relative;
+    min-width: 0;
+    min-height: 10px;
+    cursor: row-resize;
+    touch-action: none;
+    outline: none;
+  }
+  .workspace-resizer::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    left: 14px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--panel-border);
+    transform: translateY(-50%);
+    transition: background .12s ease, height .12s ease;
+  }
+  .workspace-resizer:hover::before,
+  .workspace-resizer:focus-visible::before,
+  body.resizing-result .workspace-resizer::before {
+    height: 3px;
+    background: var(--accent);
+  }
+  .workspace-resizer:focus-visible::before {
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  body.resizing-result {
+    cursor: row-resize;
+    user-select: none;
+  }
+
+  .result-panel {
+    grid-column: 2;
+    grid-row: 3;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Шапка ─────────────────────────────────────────── */
+  .header {
+    background: var(--header-bg);
+    border-radius: 16px;
+    padding: 18px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+    flex: none;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .brand-mark {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--mark);
+    flex: none;
+  }
+  .brand-text { min-width: 0; }
+  .brand-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--header-text);
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .brand-sub {
+    font-size: 12px;
+    color: var(--header-subtext);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--header-subtext);
+    font-size: 13px;
+    flex: none;
+  }
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--warn);
+  }
+  .status-dot.ok   { background: #7BE0A4; box-shadow: 0 0 6px rgba(123,224,164,.7); }
+  .status-dot.err  { background: #F08A80; box-shadow: 0 0 6px rgba(240,138,128,.7); }
+
+  /* ── Панели ────────────────────────────────────────── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 18px 20px;
+  }
+  .tool-column .panel + .panel { margin-top: 14px; }
+  .panel-title {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  /* ── Инструменты ───────────────────────────────────── */
+  .tools {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+  }
+  .compact-tools {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 620px));
+    justify-content: start;
+  }
+  .compact-tools .params { max-width: 460px; }
+  .screenshot-tools { grid-template-columns: 1fr; }
+  .capture-tool {
+    width: 100%;
+    max-width: 900px;
+    justify-self: start;
+  }
+  .capture-tool .check-param {
+    width: fit-content;
+    max-width: 100%;
+  }
+  .tool-wide { grid-column: 1 / -1; }
+  .tool {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tool-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .tool-name {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .tool-tag {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    flex: none;
+  }
+  .tool-desc {
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 13px;
+    min-height: 2.6em;
+  }
+
+  .params {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .params-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .params-grid.crop-params {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .param-wide { grid-column: 1 / -1; }
+  .param-span-2 { grid-column: span 2; }
+  .param {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 10px;
+    padding: 8px 12px;
+  }
+  .param-meta {
+    display: flex;
+    justify-content: flex-start;
+    align-items: baseline;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed var(--input-border);
+  }
+  .param-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+  .param-type {
+    display: none;
+  }
+  .hwnd-param {
+    width: 100%;
+    max-width: 520px;
+    justify-self: start;
+  }
+
+  input[type="number"], input[type="text"] {
+    width: 100%;
+    border: 1px solid var(--input-border);
+    background: #FFFFFF;
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 6px 10px;
+    outline: none;
+  }
+  input[type="number"]::placeholder, input[type="text"]::placeholder {
+    color: var(--text-muted);
+    font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    opacity: .52;
+  }
+  input[type="number"]:focus, input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  .input-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .input-inline input {
+    min-width: 0;
+    flex: 1;
+  }
+  .paste-btn {
+    appearance: none;
+    min-height: 33px;
+    flex: none;
+    padding: 6px 10px;
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text-soft);
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .paste-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .paste-btn.done {
+    border-color: #B8DCC8;
+    background: #EEF8F2;
+    color: var(--ok);
+  }
+  .paste-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .check-param {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 38px;
+    color: var(--text-soft);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .check-param input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    flex: none;
+  }
+
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease;
+  }
+  .btn:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-row {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: auto;
+  }
+  .btn-row .btn {
+    width: 180px;
+    max-width: 100%;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--input-border);
+    color: var(--text-soft);
+    font-weight: 600;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--accent-soft);
+    border-color: var(--input-border);
+    color: var(--accent);
+  }
+  .btn-ghost.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+
+  /* ── Результат ─────────────────────────────────────── */
+  .result-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .result-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .result-badge {
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .result-badge.err { background: var(--err); }
+  .result-caption {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .result-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .result-time {
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .view-switch { display: inline-flex; gap: 0; }
+  .view-switch .btn-ghost { border-radius: 0; }
+  .view-switch .btn-ghost:first-child { border-radius: 8px 0 0 8px; }
+  .view-switch .btn-ghost:last-child { border-radius: 0 8px 8px 0; border-left: none; }
+
+  .output {
+    background: #FDFEFF;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    padding-bottom: 1cm;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 120px;
+    max-height: 60vh;
+    overflow: auto;
+    color: var(--text);
+  }
+  .result-panel .output {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+  }
+  pre.output {
+    white-space: pre;
+  }
+  pre.output code { font-family: inherit; font-size: inherit; }
+
+  .output.err {
+    background: #FDF4F3;
+    border-color: #EFC5C0;
+    color: var(--err);
+  }
+  .copy-toast {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--ok);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    opacity: 0;
+    min-height: 1em;
+    transition: opacity .2s ease;
+    display: none;
+  }
+  .copy-toast.show { display: inline-block; opacity: 1; }
+  .copy-toast.err { background: var(--err); }
+
+  .pid-link {
+    color: var(--accent);
+    text-decoration: underline dotted;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0 2px;
+    border-radius: 3px;
+    transition: background .12s ease;
+  }
+  .pid-link:hover {
+    background: var(--accent-soft);
+  }
+
+  .screenshot-link {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    cursor: zoom-in;
+    font-weight: 600;
+  }
+  .screenshot-link:hover { color: var(--accent-hover); }
+
+  .image-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(10, 26, 39, .82);
+    backdrop-filter: blur(3px);
+  }
+  .image-dialog {
+    width: min(96vw, 1500px);
+    height: min(94vh, 1000px);
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 14px;
+    box-shadow: 0 22px 70px rgba(0,0,0,.38);
+    overflow: hidden;
+  }
+  .image-dialog-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px 10px 16px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .image-dialog-path {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-soft);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .image-close {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text-soft);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .image-close:hover { background: var(--accent-soft); color: var(--accent); }
+  .image-stage {
+    min-height: 0;
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: 14px;
+    overflow: auto;
+    background:
+      linear-gradient(45deg, #E7ECF1 25%, transparent 25%),
+      linear-gradient(-45deg, #E7ECF1 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #E7ECF1 75%),
+      linear-gradient(-45deg, transparent 75%, #E7ECF1 75%),
+      #F8FAFC;
+    background-size: 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+  }
+  .image-stage img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    box-shadow: 0 5px 24px rgba(20, 45, 65, .22);
+  }
+  body.overlay-open { overflow: hidden; }
+
+  .meta-bar {
+    margin-top: 8px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .hidden { display: none !important; }
+
+  /* Спиннер */
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255,255,255,.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 980px) {
+    .page {
+      padding: 12px;
+    }
+    .workspace {
+      grid-template-columns: 170px minmax(0, 1fr);
+      --result-height: clamp(220px, 36vh, 320px);
+      grid-template-rows: minmax(0, 1fr) 10px var(--result-height);
+    }
+    .screenshot-tools { grid-template-columns: 1fr; }
+    .params-grid.crop-params { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .param-span-2 { grid-column: span 2; }
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 8px; }
+    .header {
+      flex-direction: row;
+      align-items: center;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      border-radius: 12px;
+    }
+    .brand-name { font-size: 18px; }
+    .brand-sub { display: none; }
+    .status { font-size: 11px; }
+    .workspace {
+      grid-template-columns: 1fr;
+      --result-height: minmax(210px, 39vh);
+      grid-template-rows: auto minmax(0, 1fr) 10px var(--result-height);
+      gap: 8px;
+    }
+    .tool-nav {
+      grid-column: 1;
+      grid-row: 1;
+      padding: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .tool-nav .panel-title, .tool-nav-group-title { display: none; }
+    .tool-nav-groups { display: flex; gap: 4px; }
+    .tool-nav-group { display: flex; gap: 4px; }
+    .tool-nav-group + .tool-nav-group {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+    .tool-nav-link { min-height: 30px; padding: 5px 8px; }
+    .tool-nav-link::before { display: none; }
+    .tool-column {
+      grid-column: 1;
+      grid-row: 2;
+      padding-right: 0;
+    }
+    .workspace-resizer {
+      grid-column: 1;
+      grid-row: 3;
+    }
+    .result-panel {
+      grid-column: 1;
+      grid-row: 4;
+    }
+    .panel, .tool { border-radius: 12px; }
+    .panel { padding: 14px; }
+    .result-panel { padding: 12px; }
+    .compact-tools { grid-template-columns: minmax(0, 1fr); }
+    .screenshot-tools { grid-template-columns: 1fr; }
+    .params-grid, .params-grid.crop-params { grid-template-columns: 1fr; }
+    .param-wide, .param-span-2 { grid-column: auto; }
+    .result-head { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Шапка -->
+  <header class="header">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <div class="brand-text">
+        <div class="brand-name">V8:Pulsar</div>
+        <div class="brand-sub">Тестовый стенд MCP-инструментов</div>
+      </div>
+    </div>
+    <div id="serverStatus" class="status">
+      <span class="status-dot"></span>
+      <span>проверка…</span>
+    </div>
+  </header>
+
+  <div class="workspace">
+  <div class="tool-workspace">
+
+  <aside class="panel tool-nav" aria-label="Разделы инструментов">
+    <h2 class="panel-title">Разделы</h2>
+    <nav class="tool-nav-groups">
+      <div class="tool-nav-group">
+        <h3 class="tool-nav-group-title">Сеансы</h3>
+        <a class="tool-nav-link active" href="#tool-list-sessions" aria-current="true">list_sessions</a>
+        <a class="tool-nav-link" href="#tool-get-session">get_session</a>
+      </div>
+      <div class="tool-nav-group">
+        <h3 class="tool-nav-group-title">Окна</h3>
+        <a class="tool-nav-link" href="#tool-list-windows">list_windows</a>
+      </div>
+      <div class="tool-nav-group">
+        <h3 class="tool-nav-group-title">Снимки</h3>
+        <a class="tool-nav-link" href="#tool-capture-screenshot">capture_screenshot</a>
+        <a class="tool-nav-link" href="#tool-crop-screenshot">crop_screenshot</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="tool-column">
+
+  <!-- Сеансы -->
+  <section id="section-sessions" class="panel tool-section">
+    <h2 class="panel-title">Сеансы</h2>
+    <div class="tools compact-tools">
+
+      <div id="tool-list-sessions" class="tool">
+        <div class="tool-head">
+          <span class="tool-name">list_sessions</span>
+          <span class="tool-tag">чтение</span>
+        </div>
+        <p class="tool-desc">Возвращает список всех активных сеансов 1С:Предприятие и Конфигуратора.</p>
+        <div class="params"></div>
+        <div class="btn-row">
+          <button class="btn" onclick="callTool('list_sessions', {}, this)">
+            <span class="spinner hidden"></span>
+            <span class="btn-label">Вызвать</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="tool-get-session" class="tool">
+        <div class="tool-head">
+          <span class="tool-name">get_session</span>
+          <span class="tool-tag">чтение</span>
+        </div>
+        <p class="tool-desc">Подробная информация об одном процессе по PID.</p>
+        <div class="params">
+          <div class="param">
+            <div class="param-meta">
+              <span class="param-name">processId</span>
+              <span class="param-type">integer · required</span>
+            </div>
+            <div class="input-inline">
+              <input type="text" id="pidInput" spellcheck="false" autocomplete="off">
+              <button class="paste-btn" type="button" onclick="pasteFromClipboard('pidInput', this)" aria-label="Вставить PID из буфера обмена">Вставить</button>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="callGetSession(this)">
+            <span class="spinner hidden"></span>
+            <span class="btn-label">Вызвать</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Окна -->
+  <section id="section-windows" class="panel tool-section">
+    <h2 class="panel-title">Окна</h2>
+    <div class="tools compact-tools">
+
+      <div id="tool-list-windows" class="tool">
+        <div class="tool-head">
+          <span class="tool-name">list_windows</span>
+          <span class="tool-tag">чтение</span>
+        </div>
+        <p class="tool-desc">Возвращает окна процесса, их HWND и локальную область для последующего кропа.</p>
+        <div class="params">
+          <div class="param">
+            <div class="param-meta">
+              <span class="param-name">processId</span>
+              <span class="param-type">integer · required</span>
+            </div>
+            <div class="input-inline">
+              <input type="text" id="windowsPidInput" spellcheck="false" autocomplete="off">
+              <button class="paste-btn" type="button" onclick="pasteFromClipboard('windowsPidInput', this)" aria-label="Вставить PID из буфера обмена">Вставить</button>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="callListWindows(this)">
+            <span class="spinner hidden"></span>
+            <span class="btn-label">Вызвать</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Снимки -->
+  <section id="section-screenshots" class="panel tool-section">
+    <h2 class="panel-title">Снимки</h2>
+    <div class="tools screenshot-tools">
+
+      <div id="tool-capture-screenshot" class="tool capture-tool">
+        <div class="tool-head">
+          <span class="tool-name">capture_screenshot</span>
+          <span class="tool-tag">PNG</span>
+        </div>
+        <p class="tool-desc">Сохраняет общий снимок процесса по PID или снимок одного окна по HWND.</p>
+        <div class="params-grid">
+          <div class="param">
+            <div class="param-meta">
+              <span class="param-name">processId</span>
+              <span class="param-type">integer · optional</span>
+            </div>
+            <div class="input-inline">
+              <input type="text" id="capturePidInput" spellcheck="false" autocomplete="off">
+              <button class="paste-btn" type="button" onclick="pasteFromClipboard('capturePidInput', this)" aria-label="Вставить PID из буфера обмена">Вставить</button>
+            </div>
+          </div>
+          <div class="param hwnd-param">
+            <div class="param-meta">
+              <span class="param-name">hwnd</span>
+              <span class="param-type">string · optional</span>
+            </div>
+            <div class="input-inline">
+              <input type="text" id="captureHwndInput" placeholder="0x… или число" spellcheck="false" autocomplete="off">
+              <button class="paste-btn" type="button" onclick="pasteFromClipboard('captureHwndInput', this)" aria-label="Вставить HWND из буфера обмена">Вставить</button>
+            </div>
+          </div>
+          <div class="param param-wide">
+            <div class="param-meta">
+              <span class="param-name">output_file</span>
+              <span class="param-type">string · optional</span>
+            </div>
+            <input type="text" id="captureOutputInput" placeholder="пусто — временный PNG" spellcheck="false" autocomplete="off">
+          </div>
+          <label class="param param-wide check-param">
+            <input type="checkbox" id="captureDiagnosticInput">
+            <span><span class="param-name">diagnosticLayout</span> — разнести перекрывающиеся диалоги</span>
+          </label>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="callCaptureScreenshot(this)">
+            <span class="spinner hidden"></span>
+            <span class="btn-label">Вызвать</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="tool-crop-screenshot" class="tool tool-wide">
+        <div class="tool-head">
+          <span class="tool-name">crop_screenshot</span>
+          <span class="tool-tag">PNG · кроп</span>
+        </div>
+        <p class="tool-desc">Сохраняет фрагмент окна. Координаты берутся только из <span class="tool-name">cropCaptureRect</span> результата <span class="tool-name">list_windows</span>.</p>
+        <div class="params-grid crop-params">
+          <div class="param param-span-2 hwnd-param">
+            <div class="param-meta">
+              <span class="param-name">hwnd</span>
+              <span class="param-type">string · required</span>
+            </div>
+            <div class="input-inline">
+              <input type="text" id="cropHwndInput" placeholder="0x… или число" spellcheck="false" autocomplete="off">
+              <button class="paste-btn" type="button" onclick="pasteFromClipboard('cropHwndInput', this)" aria-label="Вставить HWND из буфера обмена">Вставить</button>
+            </div>
+          </div>
+          <div class="param param-span-2">
+            <div class="param-meta">
+              <span class="param-name">output_file</span>
+              <span class="param-type">string · optional</span>
+            </div>
+            <input type="text" id="cropOutputInput" placeholder="пусто — временный PNG" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="param">
+            <div class="param-meta">
+              <span class="param-name">width</span>
+              <span class="param-type">integer · required</span>
+            </div>
+            <input type="text" id="cropWidthInput" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="param">
+            <div class="param-meta">
+              <span class="param-name">height</span>
+              <span class="param-type">integer · required</span>
+            </div>
+            <input type="text" id="cropHeightInput" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="param">
+            <div class="param-meta">
+              <span class="param-name">left</span>
+              <span class="param-type">integer · required</span>
+            </div>
+            <input type="text" id="cropLeftInput" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="param">
+            <div class="param-meta">
+              <span class="param-name">top</span>
+              <span class="param-type">integer · required</span>
+            </div>
+            <input type="text" id="cropTopInput" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="param">
+            <div class="param-meta">
+              <span class="param-name">magnify</span>
+              <span class="param-type">integer · optional</span>
+            </div>
+            <input type="text" id="cropMagnifyInput" placeholder="2 или 4" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="callCropScreenshot(this)">
+            <span class="spinner hidden"></span>
+            <span class="btn-label">Вызвать</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  </main>
+  </div>
+
+  <div id="workspaceResizer" class="workspace-resizer"
+       role="separator"
+       aria-orientation="horizontal"
+       aria-label="Изменить высоту результата"
+       tabindex="0"></div>
+
+  <!-- Результат -->
+  <section class="panel result-panel">
+    <div class="result-head">
+      <div class="result-title">
+        <span id="resultTool" class="result-badge hidden">—</span>
+        <h2 class="result-caption">Результат</h2>
+      </div>
+      <div class="result-side">
+        <span class="result-time" id="metaInfo"></span>
+        <span class="view-switch">
+          <button class="btn btn-ghost btn-sm active" id="btnText" onclick="switchView('text')">Текст</button>
+          <button class="btn btn-ghost btn-sm" id="btnJson" onclick="switchView('json')">JSON</button>
+        </span>
+        <button class="btn btn-ghost btn-sm" onclick="copyResult()">Копировать</button>
+      </div>
+    </div>
+
+    <div id="textOutput" class="output hidden"></div>
+    <pre id="jsonOutput" class="output hidden"><code class="language-json" id="jsonCode"></code></pre>
+    <span class="copy-toast" id="copyToast"></span>
+  </section>
+
+  </div>
+
+</div>
+
+<div id="imageOverlay" class="image-overlay hidden" aria-hidden="true">
+  <div class="image-dialog" role="dialog" aria-modal="true" aria-labelledby="imageOverlayPath">
+    <div class="image-dialog-head">
+      <span id="imageOverlayPath" class="image-dialog-path"></span>
+      <button id="imageOverlayClose" class="image-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <div class="image-stage">
+      <img id="imageOverlayImg" alt="Снимок V8:Pulsar">
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const textOutput = $('textOutput');
+const jsonOutput = $('jsonOutput');
+const jsonCode = $('jsonCode');
+const metaInfo = $('metaInfo');
+const serverStatus = $('serverStatus');
+const resultTool = $('resultTool');
+const copyToast = $('copyToast');
+const imageOverlay = $('imageOverlay');
+const imageOverlayImg = $('imageOverlayImg');
+const imageOverlayPath = $('imageOverlayPath');
+const imageOverlayClose = $('imageOverlayClose');
+const toolColumn = document.querySelector('.tool-column');
+const toolNavLinks = [...document.querySelectorAll('.tool-nav-link')];
+
+let currentResult = null;
+let currentView = 'text';
+let imageOverlayTrigger = null;
+
+function switchView(mode) {
+  currentView = mode;
+  $('btnText').classList.toggle('active', mode === 'text');
+  $('btnJson').classList.toggle('active', mode === 'json');
+  textOutput.classList.toggle('hidden', mode !== 'text');
+  jsonOutput.classList.toggle('hidden', mode !== 'json');
+}
+
+function renderResult(tool, rawResult, elapsedMs, screenshots = []) {
+  currentResult = rawResult;
+  resultTool.classList.remove('hidden', 'err');
+  textOutput.classList.remove('err');
+  jsonOutput.classList.remove('err');
+  if (elapsedMs !== undefined) {
+    metaInfo.textContent = elapsedMs + ' мс';
+  }
+
+  const mcpResult = rawResult && rawResult.result;
+  const content = mcpResult && mcpResult.content;
+  let textParts = [];
+  let hasText = false;
+  let isError = false;
+
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      if (item.type === 'text' && typeof item.text === 'string') {
+        textParts.push(item.text);
+        hasText = true;
+        if (/"success"\s*:\s*false/.test(item.text)) isError = true;
+      }
+    }
+  }
+
+  resultTool.textContent = tool;
+  if (isError) {
+    resultTool.classList.add('err');
+    textOutput.classList.add('err');
+    jsonOutput.classList.add('err');
+  }
+
+  if (hasText) {
+    setTextWithPidLinks(textOutput, textParts.join('\n\n'), screenshots);
+    textOutput.classList.remove('hidden');
+    switchView('text');
+  } else {
+    textOutput.textContent = '(нет текстового содержимого)';
+    textOutput.classList.remove('hidden');
+    switchView('json');
+  }
+
+  jsonCode.textContent = JSON.stringify(rawResult, null, 2);
+  jsonCode.className = 'language-json';
+  Prism.highlightElement(jsonCode);
+
+}
+
+function renderError(tool, msg, elapsedMs) {
+  resultTool.textContent = tool;
+  resultTool.classList.remove('hidden');
+  resultTool.classList.add('err');
+  if (elapsedMs !== undefined) {
+    metaInfo.textContent = elapsedMs + ' мс';
+  }
+
+  setTextWithPidLinks(textOutput, msg);
+  textOutput.classList.remove('hidden');
+  textOutput.classList.add('err');
+  jsonOutput.classList.add('err');
+  switchView('text');
+
+  jsonCode.textContent = JSON.stringify({error: msg}, null, 2);
+  Prism.highlightElement(jsonCode);
+}
+
+async function callTool(tool, args, btn) {
+  const spinner = btn.querySelector('.spinner');
+  spinner.classList.remove('hidden');
+  btn.disabled = true;
+  const t0 = performance.now();
+
+  try {
+    const res = await fetch('/api/call', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tool, args})
+    });
+    const data = await res.json();
+    const elapsed = Math.round(performance.now() - t0);
+
+    if (data.ok) {
+      renderResult(tool, data.result, elapsed, data.screenshots || []);
+    } else {
+      renderError(tool, 'Ошибка: ' + (data.error || 'неизвестная'), elapsed);
+    }
+  } catch (e) {
+    renderError(tool, 'Сеть: ' + e.message, Math.round(performance.now() - t0));
+  } finally {
+    spinner.classList.add('hidden');
+    btn.disabled = false;
+  }
+}
+
+function callGetSession(btn) {
+  const raw = $('pidInput').value;
+  callTool('get_session', {processId: raw}, btn);
+}
+
+function optionalInput(id) {
+  const value = $(id).value;
+  return value === '' ? undefined : value;
+}
+
+function withoutUndefined(args) {
+  return Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined));
+}
+
+function callListWindows(btn) {
+  callTool('list_windows', {processId: $('windowsPidInput').value}, btn);
+}
+
+function callCaptureScreenshot(btn) {
+  const args = withoutUndefined({
+    processId: optionalInput('capturePidInput'),
+    hwnd: optionalInput('captureHwndInput'),
+    output_file: optionalInput('captureOutputInput'),
+    diagnosticLayout: $('captureDiagnosticInput').checked
+  });
+  callTool('capture_screenshot', args, btn);
+}
+
+function callCropScreenshot(btn) {
+  const args = withoutUndefined({
+    hwnd: $('cropHwndInput').value,
+    width: $('cropWidthInput').value,
+    height: $('cropHeightInput').value,
+    left: $('cropLeftInput').value,
+    top: $('cropTopInput').value,
+    output_file: optionalInput('cropOutputInput'),
+    magnify: optionalInput('cropMagnifyInput')
+  });
+  callTool('crop_screenshot', args, btn);
+}
+
+let toastTimer = null;
+function showToast(text, isErr) {
+  copyToast.textContent = text;
+  copyToast.classList.toggle('err', !!isErr);
+  copyToast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => copyToast.classList.remove('show'), 3000);
+}
+
+// Линковка PID-ов: 4+ цифр, но НЕ порты, НЕ версии платформы, НЕ hex.
+function setTextWithPidLinks(el, text, screenshots = []) {
+  el.innerHTML = '';
+
+  const pathMatches = [];
+  for (const screenshot of screenshots) {
+    let from = 0;
+    while (screenshot.path && (from = text.indexOf(screenshot.path, from)) !== -1) {
+      pathMatches.push({
+        start: from,
+        end: from + screenshot.path.length,
+        path: screenshot.path,
+        url: screenshot.url
+      });
+      from += screenshot.path.length;
+    }
+  }
+  pathMatches.sort((a, b) => a.start - b.start || b.end - a.end);
+
+  let pathEnd = 0;
+  for (const match of pathMatches) {
+    if (match.start < pathEnd) continue;
+    appendTextWithPidLinks(el, text.slice(pathEnd, match.start));
+    const link = document.createElement('a');
+    link.className = 'screenshot-link';
+    link.href = match.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = match.path;
+    link.dataset.imageUrl = match.url;
+    link.dataset.imagePath = match.path;
+    link.title = 'Открыть снимок';
+    el.appendChild(link);
+    pathEnd = match.end;
+  }
+  appendTextWithPidLinks(el, text.slice(pathEnd));
+}
+
+function appendTextWithPidLinks(el, text) {
+  // Маскируем контексты, которые не должны линковаться:
+  //   :1539, :7100            → порты
+  //   8.3.22.1304             → версии платформы (4 компонента)
+  //   "версия": "8.3..."      → захвачено предыдущим
+  //   0x1A3F, 8080            → через lookarounds
+  const re = /\d{4,}/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const s = m.index;
+    const e = m.index + m[0].length;
+    const before = text.slice(Math.max(0, s - 3), s);   // до 3 символов до
+    const before15 = text.slice(Math.max(0, s - 15), s).toLowerCase();
+    const after = text.slice(e, e + 1);
+
+    // 1) порт: ':1561', ': 7100'
+    if (/:\s*$/.test(before)) continue;
+    // 2) hex: '0x3039'
+    if (/0x$/i.test(before)) continue;
+    // 3) часть слова / идентификатора: 'v1234', 'pid1234'
+    if (/[0-9A-Za-z_]$/.test(before)) continue;
+    // 4) версия платформы: '8.' или 'x.' до числа, либо '.' после
+    if (/\.\s*$/.test(before)) continue;
+    if (/^[.:]/.test(after)) continue;
+    // 5) явные маркеры портов/версий в контексте
+    if (/(порт|port|tport|версия|version)\s*[:=]?\s*$/i.test(before15)) continue;
+
+    if (s > last) el.appendChild(document.createTextNode(text.slice(last, s)));
+    const a = document.createElement('a');
+    a.className = 'pid-link';
+    a.textContent = m[0];
+    a.dataset.pid = m[0];
+    a.title = 'Скопировать в буфер обмена';
+    el.appendChild(a);
+    last = e;
+  }
+  if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+}
+
+textOutput.addEventListener('click', e => {
+  const screenshot = e.target.closest('.screenshot-link');
+  if (screenshot) {
+    e.preventDefault();
+    openImageOverlay(screenshot.dataset.imageUrl, screenshot.dataset.imagePath, screenshot);
+    return;
+  }
+
+  const a = e.target.closest('.pid-link');
+  if (!a) return;
+  e.preventDefault();
+  copyToClipboard(a.dataset.pid, 'Скопировано в буфер обмена');
+});
+
+function openImageOverlay(url, path, trigger) {
+  imageOverlayTrigger = trigger;
+  imageOverlayImg.src = url;
+  imageOverlayImg.alt = path;
+  imageOverlayPath.textContent = path;
+  imageOverlay.classList.remove('hidden');
+  imageOverlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('overlay-open');
+  imageOverlayClose.focus();
+}
+
+function closeImageOverlay() {
+  const returnFocus = imageOverlayTrigger;
+  imageOverlayClose.blur();
+  if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+  imageOverlay.classList.add('hidden');
+  imageOverlay.setAttribute('aria-hidden', 'true');
+  imageOverlayImg.removeAttribute('src');
+  document.body.classList.remove('overlay-open');
+  imageOverlayTrigger = null;
+}
+
+imageOverlayClose.addEventListener('click', closeImageOverlay);
+imageOverlay.addEventListener('click', e => {
+  if (e.target === imageOverlay) closeImageOverlay();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !imageOverlay.classList.contains('hidden')) {
+    closeImageOverlay();
+  }
+});
+
+async function copyToClipboard(text, toastMsg) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(toastMsg);
+    return;
+  } catch {}
+  // Fallback для headless/ограниченных контекстов
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast(toastMsg);
+  } catch {
+    showToast('не удалось скопировать');
+  } finally {
+    document.body.removeChild(ta);
+  }
+}
+
+async function pasteFromClipboard(inputId, button) {
+  const input = $(inputId);
+  input.focus();
+
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error('clipboard_unavailable');
+    const text = await navigator.clipboard.readText();
+    input.value = text;
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    input.setSelectionRange(text.length, text.length);
+
+    const originalText = button.dataset.originalText || button.textContent;
+    button.dataset.originalText = originalText;
+    button.textContent = 'Вставлено';
+    button.classList.add('done');
+    clearTimeout(button._pasteTimer);
+    button._pasteTimer = setTimeout(() => {
+      button.textContent = originalText;
+      button.classList.remove('done');
+    }, 1400);
+  } catch {
+    showToast('Буфер недоступен. Нажмите Ctrl+V', true);
+  }
+}
+
+function setActiveToolLink(activeLink) {
+  for (const link of toolNavLinks) {
+    const isActive = link === activeLink;
+    link.classList.toggle('active', isActive);
+    if (isActive) link.setAttribute('aria-current', 'true');
+    else link.removeAttribute('aria-current');
+  }
+}
+
+function updateActiveToolLink() {
+  const columnTop = toolColumn.getBoundingClientRect().top + 18;
+  let activeLink = toolNavLinks[0];
+
+  for (const link of toolNavLinks) {
+    const target = document.querySelector(link.hash);
+    if (target && target.getBoundingClientRect().top <= columnTop + 24) activeLink = link;
+  }
+  setActiveToolLink(activeLink);
+}
+
+for (const link of toolNavLinks) {
+  link.addEventListener('click', event => {
+    event.preventDefault();
+    const target = document.querySelector(link.hash);
+    if (!target) return;
+    const top = target.getBoundingClientRect().top - toolColumn.getBoundingClientRect().top + toolColumn.scrollTop;
+    toolColumn.scrollTo({
+      top,
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+    });
+    setActiveToolLink(link);
+  });
+}
+
+let navScrollFrame = null;
+toolColumn.addEventListener('scroll', () => {
+  if (navScrollFrame !== null) return;
+  navScrollFrame = requestAnimationFrame(() => {
+    updateActiveToolLink();
+    navScrollFrame = null;
+  });
+}, {passive: true});
+
+function copyResult() {
+  const text = currentView === 'text' ? textOutput.textContent : jsonCode.textContent;
+  copyToClipboard(text, 'Скопировано');
+}
+
+function initWorkspaceResizer() {
+  const workspace = document.querySelector('.workspace');
+  const resizer = $('workspaceResizer');
+  const resultPanel = document.querySelector('.result-panel');
+  if (!workspace || !resizer || !resultPanel) return;
+
+  let dragging = false;
+  let dragOffset = 0;
+
+  function applyResultHeight(height) {
+    const workspaceRect = workspace.getBoundingClientRect();
+    const rowGap = parseFloat(getComputedStyle(workspace).rowGap) || 0;
+    const resizerHeight = Math.max(10, resizer.getBoundingClientRect().height || 10);
+    const minTools = Math.min(260, Math.max(180, workspaceRect.height * .28));
+    const minResult = Math.min(220, Math.max(140, workspaceRect.height * .16));
+    const maxResult = Math.max(minResult, workspaceRect.height - minTools - resizerHeight - rowGap * 2);
+    const nextHeight = Math.round(Math.max(minResult, Math.min(maxResult, height)));
+
+    workspace.style.setProperty('--result-height', `${nextHeight}px`);
+    resizer.setAttribute('aria-valuemin', String(Math.round(minResult)));
+    resizer.setAttribute('aria-valuemax', String(Math.round(maxResult)));
+    resizer.setAttribute('aria-valuenow', String(nextHeight));
+  }
+
+  function applyResultHeightFromPointer(clientY) {
+    const workspaceRect = workspace.getBoundingClientRect();
+    applyResultHeight(workspaceRect.bottom - clientY - dragOffset);
+  }
+
+  resizer.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    dragging = true;
+    dragOffset = resultPanel.getBoundingClientRect().top - event.clientY;
+    resizer.setPointerCapture(event.pointerId);
+    document.body.classList.add('resizing-result');
+    event.preventDefault();
+  });
+
+  resizer.addEventListener('pointermove', event => {
+    if (dragging) applyResultHeightFromPointer(event.clientY);
+  });
+
+  function stopDragging(event) {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove('resizing-result');
+    if (event.pointerId !== undefined && resizer.hasPointerCapture(event.pointerId)) {
+      resizer.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  resizer.addEventListener('pointerup', stopDragging);
+  resizer.addEventListener('pointercancel', stopDragging);
+  resizer.addEventListener('lostpointercapture', () => {
+    dragging = false;
+    document.body.classList.remove('resizing-result');
+  });
+  resizer.addEventListener('keydown', event => {
+    const currentHeight = resultPanel.getBoundingClientRect().height;
+    if (event.key === 'ArrowUp') {
+      applyResultHeight(currentHeight + 24);
+      event.preventDefault();
+    } else if (event.key === 'ArrowDown') {
+      applyResultHeight(currentHeight - 24);
+      event.preventDefault();
+    } else if (event.key === 'Home') {
+      applyResultHeight(0);
+      event.preventDefault();
+    } else if (event.key === 'End') {
+      applyResultHeight(Number.POSITIVE_INFINITY);
+      event.preventDefault();
+    }
+  });
+}
+
+initWorkspaceResizer();
+
+async function ping() {
+  try {
+    await fetch('/', {cache: 'no-store'});
+    serverStatus.innerHTML = '<span class="status-dot ok"></span><span>сервер на связи</span>';
+  } catch {
+    serverStatus.innerHTML = '<span class="status-dot err"></span><span>сервер недоступен</span>';
+  }
+}
+ping();
+setInterval(ping, 5000);
+</script>
+</body>
+</html>
