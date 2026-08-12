@@ -1,4 +1,8 @@
 .release-assets/
+**/bin/
+**/obj/
+**/__pycache__/
+*.pyc
 *.tmp
 Thumbs.db
 .DS_Store
