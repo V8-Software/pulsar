@@ -313,7 +313,7 @@ class Handler(BaseHTTPRequestHandler):
 # ────────────────────────────────────────────────────────────────
 
 def find_exe() -> Path | None:
-    """Ищет v8-pulsar.exe в явной настройке и стандартных местах."""
+    """Ищет v8-pulsar.exe в явной настройке, рабочей сборке и установке."""
     configured = os.environ.get("V8_PULSAR_EXE", "").strip()
     if configured:
         candidate = Path(os.path.expandvars(configured)).expanduser()
@@ -321,6 +321,20 @@ def find_exe() -> Path | None:
             return candidate.resolve()
 
     stand_dir = Path(__file__).resolve().parent
+    development_patterns = [
+        "v8-pulsar/bin/Release/net9.0-windows*/win-x64/v8-pulsar.exe",
+        "v8-pulsar/bin/Release/net9.0-windows*/v8-pulsar.exe",
+        "v8-pulsar/bin/Debug/net9.0-windows*/win-x64/v8-pulsar.exe",
+        "v8-pulsar/bin/Debug/net9.0-windows*/v8-pulsar.exe",
+        "v8-pulsar/bin/Release-check/v8-pulsar.exe",
+        "v8-pulsar/bin/Test-check/v8-pulsar.exe",
+    ]
+    for base in (stand_dir.parent, stand_dir.parent.parent):
+        for pattern in development_patterns:
+            for match in base.glob(pattern):
+                if match.is_file():
+                    return match.resolve()
+
     candidates = [stand_dir / "v8-pulsar.exe"]
     for variable in ("ProgramFiles", "LOCALAPPDATA"):
         root = os.environ.get(variable)
