@@ -22,8 +22,8 @@ description: "Подготавливает автоматизированное 
 1. Вызвать `list_enterprise_sessions`.
 2. Выбрать точный TestClient по идентификатору процесса, информационной базе и порту.
 3. Проверить TestManager. Если TestClient есть, а TestManager нет, учесть, что прокси может запуститься при первом вызове `execute_testmanager_client_code`.
-4. Снять снимок окна выбранного TestClient через `capture_screenshot` и сохранить его в `%TEMP%\v8-pulsar\baseline-<timestamp>.png`.
-5. Если нужно состояние форм, после выбора TestClient получить список форм и состояние активной формы специализированными инструментами из живой схемы.
+4. Снять снимок окна выбранного TestClient через `capture_screenshot` с `processId` этой сессии и `output_file` в `%TEMP%\v8-pulsar\baseline-<timestamp>.png`.
+5. Если нужно состояние форм, после выбора TestClient получить список форм через `list_testclient_forms` и состояние активной формы через `get_testclient_form_state`.
 
 Если TestClient отсутствует, предложить запустить нужную базу как TestClient. Не выбирать обычный пользовательский сеанс вместо него без явного согласования.
 
